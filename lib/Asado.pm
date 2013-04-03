@@ -3,74 +3,73 @@ package Asado;
 use Moose;
 use Data::Dumper qw(Dumper);
 use JSON;
+use Sub::Signatures;
 
 has 'calculado' => ( is => 'rw', isa => 'Bool' );
-has 'resto' => ( is => 'rw', isa => 'Num' );
+has 'resto'     => ( is => 'rw', isa => 'Num' );
 
 my $total;
 my @gente;
 
-sub agregar {
+sub agregar ($self,$amigo) {
 
-    my $self = shift;
-    my $args = {@_};
+    $total += $amigo->puso;
 
-    $total += $args->{puso};
-    push @gente, $args;
+    push @gente,
+      {
+        nombre => $amigo->nombre,
+        puso   => $amigo->puso
+      };
 
     return $self;
 
 }
 
-sub para_web {
+sub para_web($self) {
 
-    my $self     = shift;
-    my $cada_uno = $self->total / $self->gente;
-    my $json     = {};
-    
+    my $json = {};
+
     $self->tabla;
 
-    $json->{pone_cada_uno} = $cada_uno;
+    $json->{pone_cada_uno} = $self->cada_uno;
     $json->{gastado}       = $self->total;
     $json->{personas}      = $self->gente;
-    #$json->{crudo}        = $self->crudo;
     $json->{resultado}     = $self->indexado;
+
+    #$json->{crudo}        = $self->crudo;
 
     return to_json($json);
 
 }
 
-sub crudo {
-    
-    my $self = shift;
+sub crudo($self) {
+
     return \@gente
-    
+
 }
 
-sub tabla {
+sub tabla($self) {
 
-    my $self  = shift;
-    my $loop = 0;
-    my $resto = 0;
-    
+    my $loop  = 0;
+
     return $self->resultado if $self->calculado;
 
     $self->recalcular;
 
     while ( my $sobran = $self->se_debe ) {
         $self->repartir;
+
         # TODO: en caso de infinitos decimales redondear mejor
-        $self->resto($sobran);
         last if ++$loop > 100;
     }
-
+    
+    $self->resto($self->se_debe);
     return $self->resultado;
 
 }
 
-sub indexado {
+sub indexado($self) {
 
-    my $self      = shift;
     my $resultado = {
         personas   => [],
         por_nombre => {},
@@ -104,9 +103,8 @@ sub indexado {
     return $resultado;
 }
 
-sub resultado {
+sub resultado($self) {
 
-    my $self = shift;
     my $resultado = [ [ 'Quien', 'Puso', 'Le Deben', 'Debe Poner', 'Quienes' ] ];
 
     foreach my $persona (@gente) {
@@ -132,9 +130,8 @@ sub resultado {
 
 }
 
-sub se_debe {
+sub se_debe($self) {
 
-    my $self  = shift;
     my $deben = 0;
 
     foreach (@gente) {
@@ -147,20 +144,16 @@ sub se_debe {
 
 }
 
-sub repartir {
-
-    my $self = shift;
+sub repartir($self) {
 
     foreach my $gente (@gente) {
 
+        $gente->{quien}   = [] unless exists $gente->{quien};
+        $gente->{detalle} = [] unless exists $gente->{detalle};
+
         if ( $self->le_deben($gente) ) {
 
-            my $quien = $self->recolectar($gente);
-
-            $gente->{quien}   = [] unless exists $gente->{quien};
-            $gente->{detalle} = [] unless exists $gente->{detalle};
-
-            if ($quien) {
+            if ( my $quien = $self->recolectar($gente) ) {
                 push @{ $gente->{quien} }, $quien->{nombre};
                 push @{ $gente->{detalle} },
                   {
@@ -175,10 +168,7 @@ sub repartir {
     return $self;
 }
 
-sub le_deben {
-
-    my $self    = shift;
-    my $persona = shift;
+sub le_deben($self,$persona) {
 
     if (   exists $persona->{le_deben}
         && exists $persona->{debe}
@@ -190,10 +180,7 @@ sub le_deben {
     return;
 }
 
-sub recolectar {
-
-    my $self  = shift;
-    my $gente = shift;
+sub recolectar($self,$gente) {
 
     foreach my $quien (@gente) {
         if ( $quien == $gente ) {
@@ -203,6 +190,8 @@ sub recolectar {
 
             my $debe_pos = ( $quien->{debe} * -1 );
 
+            $quien->{pone} = $debe_pos;
+
             if ( $gente->{le_deben} < $debe_pos ) {
                 $quien->{debe} += $gente->{le_deben};
                 $quien->{pone} = $gente->{le_deben};
@@ -210,12 +199,10 @@ sub recolectar {
 
             if ( $gente->{le_deben} > $debe_pos ) {
                 $quien->{debe} += $debe_pos;
-                $quien->{pone} = $debe_pos;
             }
 
             if ( $gente->{le_deben} == $debe_pos ) {
                 $quien->{debe} = 0;
-                $quien->{pone} = $debe_pos;
             }
 
             $quien->{a_quien} = [] unless exists $quien->{a_quien};
@@ -227,15 +214,14 @@ sub recolectar {
     return;
 }
 
-sub recalcular {
+sub recalcular($self) {
 
-    my $self     = shift;
-    my $cada_uno = $self->total / $self->gente;
-    
-    if ($self->gente <= 2) {
+    my $cada_uno = $self->cada_uno;
+
+    if ( $self->gente <= 2 ) {
         die 'No hay suficiente gente';
     }
-    if ($cada_uno == 0) {
+    if ( $cada_uno == 0 ) {
         die 'Nadie puso un peso';
     }
 
@@ -261,29 +247,23 @@ sub recalcular {
     return $self;
 }
 
-sub redondeo {
-
-    my $self   = shift;
-    my $number = shift;
+sub redondeo($self,$number) {
 
     if ( $number == 0 ) { return $number }
-
     return int( $number + $number / abs( $number * 2 ) );
 
 }
 
-sub total {
-
-    my $self = shift;
-    return $total;
-
+sub cada_uno($self) {
+    return $self->total / $self->gente;
 }
 
-sub gente {
+sub total($self) {
+    return $total;
+}
 
-    my $self = shift;
+sub gente($self) {
     return scalar @gente;
-
 }
 
 __PACKAGE__->meta->make_immutable();

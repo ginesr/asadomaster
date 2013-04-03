@@ -8,19 +8,19 @@ use Asado;
 
 my $asado = Asado->new;
 
-$asado->agregar(
+$asado->agregar(Amigo->new(
     nombre => 'Juan',
-    puso   => 0
+    puso   => 0)
 );
 
-$asado->agregar(
+$asado->agregar(Amigo->new(
     nombre => 'Pedro',
-    puso   => 0
+    puso   => 0)
 );
 
-$asado->agregar(
+$asado->agregar(Amigo->new(
     nombre => 'Pablo',
-    puso   => 0
+    puso   => 0)
 );
 
 is( $asado->total, 0, 'total 1' );
