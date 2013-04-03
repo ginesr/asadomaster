@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Test::More tests => 3;
 use Test::Exception;
+use Amigo;
 use Asado;
 
 my $asado = Asado->new;
