@@ -1,0 +1,6 @@
+.build
+/.includepath
+/.project
+/.externalToolBuilders
+t/db/
+./t/db/
